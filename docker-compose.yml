@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    container_name: leaderboard_redis
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - leaderboard-network
+
+  producer:
+    build: ./producer
+    container_name: leaderboard_producer
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PRODUCER_INTERVAL_MS=200
+      - PORT=8001
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - leaderboard-network
+
+  consumer:
+    build: ./consumer
+    container_name: leaderboard_consumer
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=8002
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - leaderboard-network
+
+  api:
+    build: ./api
+    container_name: leaderboard_api
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - leaderboard-network
+
+  frontend:
+    build: ./frontend
+    container_name: leaderboard_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - leaderboard-network
+
+networks:
+  leaderboard-network:
+    driver: bridge
