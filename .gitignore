@@ -11,3 +11,6 @@ build/
 # IDE / Editor folders
 .vscode/
 .idea/
+
+# Postman collection
+gaming-leaderboard.postman_collection.json
